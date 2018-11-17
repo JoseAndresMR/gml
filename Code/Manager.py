@@ -28,16 +28,31 @@ class Manager(object):
 
         for fvi in future_vel_inst_list:
 
-            pickler = Pickler(mission,role,n_dataset,world_type,N_uav,N_obs,from_ROS,fvi)
-            preprocesser = PreProcesser(role,world_type,N_uav,N_obs)
+            # pickler = Pickler(mission,role,n_dataset,world_type,N_uav,N_obs,from_ROS,fvi)
+            # preprocesser = PreProcesser(role,world_type,N_uav,N_obs)
 
             graphmakertrainer = GraphMakerTrainer(role,world_type,N_uav,N_obs)
-            batch_size = 100
-            hidden_nodes_list = [[20,20,20],[20,30,20]]
-            learning_rates_list = [0.001,0.0001,0.00001]
-            num_steps = 100000
+            batch_size = 88
+
+            # FULLY CONNECTED HYPERPARAMS
+            fc_hidden_layers_list = [[20,20,20]]
+
+            # COVNET HYPERPARAMS 
+            conv_hidden_layers_list = [[{"patch_size" : 5,
+                                      "depth" : 16,
+                                      "padding" : "SAME"},
+                                      {"patch_size" : 5,
+                                      "depth" : 16,
+                                      "padding" : "SAME"},
+                                      ]]
+
+            learning_rates_list = [0.001]
+            num_steps = 1
+
             for learning_rate in learning_rates_list:
-                for hidden_nodes in hidden_nodes_list:
-                    graph = graphmakertrainer.FullyConnected(batch_size,hidden_nodes,num_steps, learning_rate,fvi)
+                for fc_hidden_layers in fc_hidden_layers_list:
+                    for conv_hidden_layers in conv_hidden_layers_list:
+                        graph = graphmakertrainer.TrainNewOne(batch_size,num_steps,fc_hidden_layers,
+                                                                conv_hidden_layers,learning_rate,fvi)
 
 manager = Manager()

@@ -22,8 +22,22 @@ class PreProcesser(object):
 
         self.gml_folder_path = "/home/{4}/Libraries/gml/Sessions/{0}/type{1}_Nuav{2}_Nobs{3}".format(self.role,self.world_type,self.N_uav,self.N_obs,self.home_path)
 
+
+        conv_flag = True
+
+        if conv_flag == True:
+            image_size = [480, 640]  # [480,640*4]
+            num_pixels = image_size[0]*image_size[1]
+            num_channels = 1
+        else:
+            num_pixels = 0
+
+        num_outputs = 3
+
+
         with open(self.gml_folder_path + "/raw.pickle", 'rb') as f:
             whole_dataset = np.asarray(pickle.load(f))
+
         prepro_dict = {"mean": np.mean(whole_dataset,axis=0)}
         zero_mean_dataset = whole_dataset - np.tile(prepro_dict["mean"],[whole_dataset.shape[0],1])
         prepro_dict["max"] = np.max(zero_mean_dataset,axis=0)
@@ -43,12 +57,12 @@ class PreProcesser(object):
         valid_index = int(np.floor(dataset_len*train_percentage))
         test_index = int(np.floor(dataset_len*(train_percentage+test_percentage)))
 
-        train_dataset = clean_dataset[0:valid_index,:-3]
-        train_labels = clean_dataset[0:valid_index,-3:]
-        valid_dataset = clean_dataset[valid_index:test_index,:-3]
-        valid_labels = clean_dataset[valid_index:test_index,-3:]
-        test_dataset = clean_dataset[test_index:,:-3]
-        test_labels = clean_dataset[test_index:,-3:]
+        train_dataset = clean_dataset[0:valid_index,:-num_outputs]
+        train_labels = clean_dataset[0:valid_index,-num_outputs:]
+        valid_dataset = clean_dataset[valid_index:test_index,:-num_outputs]
+        valid_labels = clean_dataset[valid_index:test_index,-num_outputs:]
+        test_dataset = clean_dataset[test_index:,:-num_outputs]
+        test_labels = clean_dataset[test_index:,-num_outputs:]
 
         try:
             f = open(self.gml_folder_path + "/preprocessed.pickle", 'wb')
@@ -61,6 +75,7 @@ class PreProcesser(object):
                 'test_labels': test_labels,
                 'prepro_dict' : prepro_dict
                 }
+
             pickle.dump(save, f, pickle.HIGHEST_PROTOCOL)
             f.close()
         except Exception as e:

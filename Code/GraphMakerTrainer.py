@@ -8,32 +8,59 @@ from six.moves import cPickle as pickle
 
 class GraphMakerTrainer(object):
     def __init__(self, role = "path",world_type = 1,N_uav = 1,N_obs = 1,from_ROS = False):
+        print("creating GraphMakerTrainer")
+        
         self.GettingWorldDefinition(role,world_type,N_uav,N_obs,from_ROS)
+
+        self.conv_flag = True
 
         self.gml_folder_path = "/home/{4}/Libraries/gml/Sessions/{0}/type{1}_Nuav{2}_Nobs{3}".format(self.role,self.world_type,self.N_uav,self.N_obs,self.home_path)
 
         self.LoadDatasetFromCSV()
 
-    def FullyConnected(self,batch_size,fc_hidden_nodes,num_steps,fc_learning_rate,conv_hidden_nodes,conv_learning_rate,fvi):                
-        self.fc_hidden_nodes = fc_hidden_nodes
-        self.fc_learning_rate = fc_learning_rate
+    def TrainNewOne(self,batch_size,num_steps,fc_hidden_layers,conv_hidden_layers= [],learning_rate= 0,fvi= 0):                
+        self.fc_hidden_layers = fc_hidden_layers
+        self.conv_hidden_layers = conv_hidden_layers
+        self.learning_rate = learning_rate
         self.fvi = fvi
         graph = tf.Graph()
         with graph.as_default():
             # Input data. For the training data, we use a placeholder that will be fed
             # at run time with a training minibatch.
-            num_inputs = self.train_dataset.shape[1]
-            num_outputs = self.train_labels.shape[1]
+
+            mu = 0
+            sigma = 0.1
+
+            if self.conv_flag == True:
+                image_size = [480, 640]  # [480,640*4]
+                num_pixels = image_size[0]*image_size[1]
+                num_channels = 1
+            else:
+                num_pixels = 0
+
+            # Divide inputs
+            fc_num_inputs = self.train_dataset.shape[1] - num_pixels
+            conv_num_inputs = num_pixels
+
+            num_inputs = fc_num_inputs + conv_num_inputs
+
+            # Placeholders
+            fc_num_outputs = self.train_labels.shape[1]
             tf_train_dataset = tf.placeholder(tf.float32,shape=(batch_size, num_inputs), name="tf_train_dataset")
-            tf_train_labels = tf.placeholder(tf.float32, shape=(batch_size, num_outputs), name="tf_train_labels")
+            tf_train_labels = tf.placeholder(tf.float32, shape=(batch_size, fc_num_outputs), name="tf_train_labels")
             tf_valid_dataset = tf.constant(self.valid_dataset.astype(np.float32))
             tf_test_dataset = tf.constant(self.test_dataset.astype(np.float32))
+            tf_single_input = tf.placeholder(tf.float32,shape=(1, num_inputs), name="single_input")
+
+            fc_train_dataset = tf_train_dataset[:,:fc_num_inputs]
+            fc_train_labels = tf_train_labels[:,:fc_num_inputs]
+            fc_valid_dataset = tf_valid_dataset[:,:fc_num_inputs]
+            fc_test_dataset = tf_test_dataset[:,:fc_num_inputs]
 
             prepro_mean = tf.constant(self.prepro_dict["mean"].astype(np.float32))
             prepro_max = tf.constant(self.prepro_dict["max"].astype(np.float32))
 
-            single_input = tf.placeholder(tf.float32,shape=(1, num_inputs), name="single_input")
-
+            # Start FC params
             self.fc_weights = []
             self.fc_biases = []
 
@@ -41,16 +68,18 @@ class GraphMakerTrainer(object):
                 with tf.name_scope(name):
                     
                     fc_layer_outputs = []
-
-                    nodes = [num_inputs]
-                    for i in range(len(self.fc_hidden_nodes)):
-                        nodes.append(self.fc_hidden_nodes[i])
-                    nodes.append(num_outputs)
+                    fc_extended_num_inputs = int(data.shape[1])
+                    print(type(fc_extended_num_inputs))
+                    nodes = [fc_extended_num_inputs]
+                    print(nodes)
+                    for i in range(len(self.fc_hidden_layers)):
+                        nodes.append(self.fc_hidden_layers[i])
+                    nodes.append(fc_num_outputs)
 
                     for n_layer in range(0,len(nodes)-1):
                         if len(self.fc_weights) < len(nodes):
 
-                            self.fc_weights.append(tf.Variable(tf.truncated_normal([nodes[n_layer], nodes[n_layer+1]]),name = "cd_w_{}".format(n_layer+1)))
+                            self.fc_weights.append(tf.Variable(tf.truncated_normal([nodes[n_layer], nodes[n_layer+1]], mean = mu, stddev=sigma),name = "cd_w_{}".format(n_layer+1)))
                             self.fc_biases.append(tf.Variable(tf.zeros([nodes[n_layer+1]]),name = "cd_b_{}".format(n_layer+1)))
 
                         if fc_layer_outputs == []:
@@ -64,43 +93,127 @@ class GraphMakerTrainer(object):
 
                     return fc_layer_outputs, self.fc_weights, self.fc_biases
 
-            def convolutional(data, name = "convolutional"):
+            # Start CONV params
 
-                conv_layer_outputs = []
+            if self.conv_flag == True:
 
-                conv = tf.nn.conv2d(data, layer1_weights, [1, 1, 1, 1], padding='SAME')
-                hidden = tf.nn.relu(conv + layer1_biases)
-                pool = tf.nn.max_pool(hidden,[1, 2, 2, 1],[1, 2, 2, 1], padding='SAME')
-                conv = tf.nn.conv2d(pool, layer2_weights, [1, 1, 1, 1], padding='SAME')
-                hidden = tf.nn.relu(conv + layer2_biases)
-                pool = tf.nn.max_pool(hidden,[1, 2, 2, 1],[1, 2, 2, 1], padding='SAME')
-                reshape = flatten(pool)
-                hidden = tf.nn.relu(tf.matmul(reshape, layer3_weights) + layer3_biases)
-                return tf.matmul(hidden, layer4_weights) + layer4_biases
+                conv_train_dataset = tf_train_dataset[:, fc_num_inputs:]
+                print(conv_train_dataset.shape)
+                conv_train_dataset = tf.manip.reshape(conv_train_dataset, (batch_size, image_size[0], image_size[1], num_channels))
+                conv_valid_dataset = tf_valid_dataset[:, fc_num_inputs:]
+                conv_test_dataset = tf_valid_dataset[:, fc_num_inputs:]
 
-            fc_layer_outputs, fc_weights, fc_biases = fully_connected(tf_train_dataset)
+                self.conv_weights = []
+                self.conv_biases = []
+
+                def convolutional(data, name = "convolutional"):
+                    with tf.name_scope(name):
+                        conv_layer_outputs = []
+
+                        # layers = [conv_num_inputs]
+                        # for layer in self.conv_hidden_layers:
+                        #     nlayersappend(layer)
+                        # layers.append(conv_num_outputs)
+                        print("flag0")
+                        for n_layer in range(len(self.conv_hidden_layers)):
+                            print("flag1")
+                            if len(self.conv_weights) < len(self.conv_hidden_layers):
+                                print("flag2")
+                                if n_layer == 0:
+                                    print("flag3")
+                                    self.conv_weights = [tf.Variable(tf.truncated_normal(
+                                        [self.conv_hidden_layers[n_layer]["patch_size"], self.conv_hidden_layers[n_layer]["patch_size"],
+                                        num_channels, self.conv_hidden_layers[n_layer]["depth"]], mean = mu, stddev=sigma),name = "conv_w_{}".format(n_layer+1))]
+                                    self.conv_biases = [tf.Variable(tf.zeros([self.conv_hidden_layers[n_layer]["depth"]]),name = "conv_b_{}".format(n_layer+1))]
+
+                                else:
+                                    print("flag4")
+                                    self.conv_weights.append(tf.Variable(tf.truncated_normal(
+                                        [self.conv_hidden_layers[n_layer]["patch_size"], self.conv_hidden_layers[n_layer]["patch_size"], 
+                                        self.conv_hidden_layers[n_layer-1]["depth"], self.conv_hidden_layers[n_layer]["depth"]], mean = mu, stddev=sigma),name = "conv_w_{}".format(n_layer+1)))
+                                    self.conv_biases.append(tf.Variable(tf.constant(1.0, shape=[self.conv_hidden_layers[n_layer]["depth"]]),name = "conv_b_{}".format(n_layer+1)))
+
+                            if conv_layer_outputs == []:
+                                print("flag5")
+                                conv = tf.nn.conv2d(data, self.conv_weights[n_layer], [1, 1, 1, 1], padding=self.conv_hidden_layers[n_layer]["padding"])
+                                print(conv.shape)
+                                hidden = tf.nn.relu(conv + self.conv_biases[n_layer])
+                                print(hidden.shape)
+                                conv_layer_outputs.append(tf.nn.max_pool(hidden,[1, 2, 2, 1],[1, 2, 2, 1], padding=self.conv_hidden_layers[n_layer]["padding"]))
+                                print(conv_layer_outputs[-1].shape)
+                            else:
+                                print("flag6")
+                                conv = tf.nn.conv2d(conv_layer_outputs[-1], self.conv_weights[n_layer], [1, 1, 1, 1], padding=self.conv_hidden_layers[n_layer]["padding"])
+                                print(conv.shape)
+                                hidden = tf.nn.relu(conv + self.conv_biases[n_layer])
+                                print(hidden.shape)
+                                conv_layer_outputs.append(tf.nn.max_pool(hidden,[1, 2, 2, 1],[1, 2, 2, 1], padding=self.conv_hidden_layers[n_layer]["padding"]))
+                                print(conv_layer_outputs[-1].shape)
+
+                        conv_layer_outputs.append(tf.contrib.layers.flatten(conv_layer_outputs[-1]))
+
+                        return conv_layer_outputs, self.conv_weights, self.conv_biases
+
+
+            # Complete model
+
+            def complete_model(fc_train_dataset, conv_train_dataset = [], name="complete_model"):
+                with tf.name_scope(name):
+
+                    if self.conv_flag == True:
+                        conv_layer_outputs, conv_weights, conv_biases = convolutional(conv_train_dataset)
+                        print("out of FC",conv_layer_outputs[-1].shape)
+                        print(fc_train_dataset.shape)
+                        fc_train_dataset_expanded = tf.concat([fc_train_dataset,conv_layer_outputs[-1]],axis=1)
+
+                        fc_layer_outputs, fc_weights, fc_biases = fully_connected(fc_train_dataset_expanded)
+
+                    else:
+                        fc_layer_outputs, fc_weights, fc_biases = fully_connected(fc_train_dataset)
+
+                    return fc_layer_outputs, fc_weights, fc_biases
+
+            if self.conv_flag == True:
+                fc_layer_outputs, fc_weights, fc_biases = complete_model(fc_train_dataset, conv_train_dataset)
+            
+            else:
+
+                fc_layer_outputs, fc_weights, fc_biases = complete_model(fc_train_dataset)
 
             logits = tf.add(fc_layer_outputs[-1], 0, name = "logits")
                         
             tf.summary.histogram("logits",logits)
             
-            def get_single_vel(data, name = "get_single_vel"):
+            def get_single_vel(tf_single_input, name="get_single_vel"):
                 with tf.name_scope(name):
-                    pretreated_data = tf.div(data - prepro_mean[:num_inputs], prepro_max[:num_inputs],name = 'pretreated_data') 
-                    # single_vel_logits = fully_connected(pretreated_data)
-                    single_logits, fc_weights, fc_biases = fully_connected(pretreated_data)
-                    # single_vel_logits = tf.add(logits[-1], 0, name = "single_vel_logits")
+
+                    tf_single_input_pretreated = tf.div(tf_single_input - prepro_mean[:num_inputs], prepro_max[:num_inputs], name='single_input_pretreated')
+
+                    if self.conv_flag == True:
+
+                        fc_single_input_pretreated = tf_single_input_pretreated[:, :fc_num_inputs]
+                        conv_single_input_pretreated = tf_single_input_pretreated[:, fc_num_inputs:]
+                        conv_single_input_pretreated = tf.manip.reshape(conv_single_input_pretreated, (1, image_size[0], image_size[1], num_channels))
+
+                        single_logits, fc_weights, fc_biases = complete_model(fc_single_input_pretreated,conv_single_input_pretreated)
+
+                    else:
+
+                        fc_single_input_pretreated = tf_single_input_pretreated
+
+                        single_logits, fc_weights, fc_biases = complete_model(fc_single_input_pretreated)
+
                     posttreated = tf.add(tf.multiply(single_logits[-1],prepro_max[num_inputs:]), prepro_mean[num_inputs:])
                     
                     return posttreated
 
-            single_logits = tf.add(get_single_vel(single_input), 0, name = "vel_posttreated")
+            single_logits = tf.add(get_single_vel(tf_single_input), 0, name = "vel_posttreated")
 
             # Regularization
             with tf.name_scope("regularization"):
                 beta = 5e-4 #tf.Variable([5e-6])
                 loss_regu = 0
-                for n_layer in range(1,len(fc_hidden_nodes)):
+                for n_layer in range(1,len(fc_hidden_layers)):
                     loss_regu += beta*tf.nn.l2_loss(fc_weights[n_layer])
 
             # Loss
@@ -109,7 +222,7 @@ class GraphMakerTrainer(object):
                 tf.summary.scalar("loss",loss)
             # Optimizer
             with tf.name_scope("train"):
-                optimizer = tf.train.GradientDescentOptimizer(0.006).minimize(loss)
+                optimizer = tf.train.GradientDescentOptimizer(self.learning_rate).minimize(loss)
 
             # Predictions for the training, validation, and test data.
             with tf.name_scope("predictions"):
@@ -130,7 +243,7 @@ class GraphMakerTrainer(object):
             saver = tf.train.Saver()
 
             merged_summary = tf.summary.merge_all()
-            hparam_str = self.make_hparam_string(self.fc_learning_rate,self.fc_hidden_nodes,self.fvi)
+            hparam_str = self.make_hparam_string(self.learning_rate,self.fc_hidden_layers,self.fvi)
             print(hparam_str)
             writer = tf.summary.FileWriter("/home/josmilrom/Libraries/gml/Sessions/{0}/type{1}_Nuav{2}_Nobs{3}/log/".format(self.role,self.world_type,self.N_uav,self.N_obs,self.home_path) + hparam_str, session.graph)
             save_path = saver.save(session,"/home/josmilrom/Libraries/gml/Sessions/{0}/type{1}_Nuav{2}_Nobs{3}/model".format(self.role,self.world_type,self.N_uav,self.N_obs,self.home_path))
@@ -149,6 +262,7 @@ class GraphMakerTrainer(object):
                 # The key of the dictionary is the placeholder node of the graph to be fed,
                 # and the value is the numpy array to feed to it.
                 feed_dict = {tf_train_dataset : batch_data, tf_train_labels : batch_labels}
+                print(batch_data.shape,"jier")
                 if step % 5 == 0:
                     s = session.run(merged_summary, feed_dict = feed_dict)
                     writer.add_summary(s,step)
@@ -187,11 +301,9 @@ class GraphMakerTrainer(object):
             self.prepro_dict = save['prepro_dict']
             
             del save  # hint to help gc free up memory
-            print('Training set', self.train_dataset.shape, self.train_labels.shape)
-            print('Validation set', self.valid_dataset.shape, self.valid_labels.shape)
-            print('Test set', self.test_dataset.shape, self.test_labels.shape)
-
-            
+            print('FC Training set', self.train_dataset.shape, self.train_labels.shape)
+            print('FC Validation set', self.valid_dataset.shape, self.valid_labels.shape)
+            print('FC Test set', self.test_dataset.shape, self.test_labels.shape)
 
     def GettingWorldDefinition(self, role = "gauss",world_type = 1,N_uav = 1,N_obs = 1,from_ROS = False):
         if from_ROS == True:
