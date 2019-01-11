@@ -10,9 +10,9 @@ import tarfile
 import time
 import hashlib
 import csv
-from IPython.display import display, Image
-from sklearn.linear_model import LogisticRegression
-from six.moves.urllib.request import urlretrieve
+# from IPython.display import display, Image
+# from sklearn.linear_model import LogisticRegression
+# from six.moves.urllib.request import urlretrieve
 from six.moves import cPickle as pickle
 from ast import literal_eval
 
@@ -108,7 +108,7 @@ class PreProcesser(object):
             self.uav_models = ["typhoon_h480","typhoon_h480","typhoon_h480"]
             self.n_dataset = 1
             self.solver_algorithm = 'orca3'
-            self.home_path = 'josmilrom'
+            self.home_path = 'joseandresmr'
             self.depth_camera_use = False
 
 # proprocesser = PreProcesser()

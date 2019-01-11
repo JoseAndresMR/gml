@@ -245,8 +245,8 @@ class GraphMakerTrainer(object):
             merged_summary = tf.summary.merge_all()
             hparam_str = self.make_hparam_string(self.learning_rate,self.fc_hidden_layers,self.fvi)
             print(hparam_str)
-            writer = tf.summary.FileWriter("/home/josmilrom/Libraries/gml/Sessions/{0}/type{1}_Nuav{2}_Nobs{3}/log/".format(self.role,self.world_type,self.N_uav,self.N_obs,self.home_path) + hparam_str, session.graph)
-            save_path = saver.save(session,"/home/josmilrom/Libraries/gml/Sessions/{0}/type{1}_Nuav{2}_Nobs{3}/model".format(self.role,self.world_type,self.N_uav,self.N_obs,self.home_path))
+            writer = tf.summary.FileWriter("/home/joseandresmr/Libraries/gml/Sessions/{0}/type{1}_Nuav{2}_Nobs{3}/log/".format(self.role,self.world_type,self.N_uav,self.N_obs,self.home_path) + hparam_str, session.graph)
+            save_path = saver.save(session,"/home/joseandresmr/Libraries/gml/Sessions/{0}/type{1}_Nuav{2}_Nobs{3}/model".format(self.role,self.world_type,self.N_uav,self.N_obs,self.home_path))
             print("Model saved in path: %s" % save_path)
 
             for step in range(num_steps):
@@ -329,5 +329,5 @@ class GraphMakerTrainer(object):
             self.uav_models = ["typhoon_h480","typhoon_h480","typhoon_h480"]
             self.n_dataset = 1
             self.solver_algorithm = 'orca3'
-            self.home_path = 'josmilrom'
+            self.home_path = 'joseandresmr'
             self.depth_camera_use = False
