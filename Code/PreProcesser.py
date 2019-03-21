@@ -17,13 +17,13 @@ from six.moves import cPickle as pickle
 from ast import literal_eval
 
 class PreProcesser(object):
-    def __init__(self, role = "path",world_type = 1,N_uav = 1,N_obs = 1,from_ROS = False):
-        self.GettingWorldDefinition(role,world_type,N_uav,N_obs,from_ROS)
+    def __init__(self,learning_dataset_def,from_ROS = False):
+        self.GettingWorldDefinition(learning_dataset_def,from_ROS)
 
-        self.gml_folder_path = "/home/{4}/Libraries/gml/Sessions/{0}/type{1}_Nuav{2}_Nobs{3}".format(self.role,self.world_type,self.N_uav,self.N_obs,self.home_path)
+        gml_folder_path = "/home/{0}/Libraries/gml".format("joseandresmr")
+        self.session_path = gml_folder_path + "/Sessions/{0}/{1}/{2}".format(self.learning_dataset_def["teacher_role"],self.learning_dataset_def["teacher_algorithm"],self.learning_dataset_def["N_neighbors_aware"])
 
-
-        conv_flag = True
+        conv_flag = False
 
         if conv_flag == True:
             image_size = [480, 640]  # [480,640*4]
@@ -35,7 +35,7 @@ class PreProcesser(object):
         num_outputs = 3
 
 
-        with open(self.gml_folder_path + "/raw.pickle", 'rb') as f:
+        with open(self.session_path + "/raw.pickle", 'rb') as f:
             whole_dataset = np.asarray(pickle.load(f))
 
         prepro_dict = {"mean": np.mean(whole_dataset,axis=0)}
@@ -65,7 +65,7 @@ class PreProcesser(object):
         test_labels = clean_dataset[test_index:,-num_outputs:]
 
         try:
-            f = open(self.gml_folder_path + "/preprocessed.pickle", 'wb')
+            f = open(self.session_path + "/preprocessed.pickle", 'wb')
             save = {
                 'train_dataset': train_dataset,
                 'train_labels': train_labels,
@@ -79,36 +79,27 @@ class PreProcesser(object):
             pickle.dump(save, f, pickle.HIGHEST_PROTOCOL)
             f.close()
         except Exception as e:
-            print('Unable to save data to', self.gml_folder_path + "/preprocessed.pickle", ':', e)
+            print('Unable to save data to', self.session_path + "/preprocessed.pickle", ':', e)
             raise
 
         print("PREPROCESSMENT done")
 
-    def GettingWorldDefinition(self, role = "gauss",world_type = 1,N_uav = 1,N_obs = 1,from_ROS = False):
+    def GettingWorldDefinition(self,learning_dataset_def,from_ROS = False):
         if from_ROS == True:
             self.world_definition = rospy.get_param('world_definition')
-            self.role = self.world_definition['role']
+            self.mission = self.world_definition['mission']
             self.world_type = self.world_definition['type']
-            self.N_uav = self.world_definition['N_uav']
+            self.N_agents = self.world_definition['N_agents']
             self.N_obs = self.world_definition['N_obs']
             self.obs_tube = self.world_definition['obs_tube']
-            self.uav_models = self.world_definition['uav_models']
+            self.agent_models = self.world_definition['agent_models']
             self.n_dataset = self.world_definition['n_dataset']
             self.solver_algorithm = self.world_definition['solver_algorithm']
             self.obs_pose_list = self.world_definition['obs_pose_list']
             self.home_path = self.world_definition['home_path']
-            self.depth_camera_use = self.world_definition['depth_camera_use']
+            self.image_depth_use = self.world_definition['image_depth_use']
 
         if from_ROS == False:
-            self.role = role
-            self.world_type = world_type
-            self.N_uav = N_uav
-            self.N_obs = N_obs
-            self.obs_tube = []
-            self.uav_models = ["typhoon_h480","typhoon_h480","typhoon_h480"]
-            self.n_dataset = 1
-            self.solver_algorithm = 'orca3'
-            self.home_path = 'joseandresmr'
-            self.depth_camera_use = False
+            self.learning_dataset_def = learning_dataset_def
 
 # proprocesser = PreProcesser()

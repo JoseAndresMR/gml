@@ -7,14 +7,16 @@ import tensorflow as tf
 from six.moves import cPickle as pickle
 
 class GraphMakerTrainer(object):
-    def __init__(self, role = "path",world_type = 1,N_uav = 1,N_obs = 1,from_ROS = False):
+    def __init__(self,learning_dataset_def,from_ROS = False):
         print("creating GraphMakerTrainer")
         
-        self.GettingWorldDefinition(role,world_type,N_uav,N_obs,from_ROS)
+        self.GettingWorldDefinition(learning_dataset_def,from_ROS)
 
-        self.conv_flag = True
+        self.conv_flag = False
 
-        self.gml_folder_path = "/home/{4}/Libraries/gml/Sessions/{0}/type{1}_Nuav{2}_Nobs{3}".format(self.role,self.world_type,self.N_uav,self.N_obs,self.home_path)
+        gml_folder_path = "/home/{0}/Libraries/gml".format("joseandresmr")
+        self.session_path = gml_folder_path + "/Sessions/{0}/{1}/{2}".format(self.learning_dataset_def["teacher_role"],self.learning_dataset_def["teacher_algorithm"],self.learning_dataset_def["N_neighbors_aware"])
+
 
         self.LoadDatasetFromCSV()
 
@@ -244,9 +246,9 @@ class GraphMakerTrainer(object):
 
             merged_summary = tf.summary.merge_all()
             hparam_str = self.make_hparam_string(self.learning_rate,self.fc_hidden_layers,self.fvi)
-            print(hparam_str)
-            writer = tf.summary.FileWriter("/home/joseandresmr/Libraries/gml/Sessions/{0}/type{1}_Nuav{2}_Nobs{3}/log/".format(self.role,self.world_type,self.N_uav,self.N_obs,self.home_path) + hparam_str, session.graph)
-            save_path = saver.save(session,"/home/joseandresmr/Libraries/gml/Sessions/{0}/type{1}_Nuav{2}_Nobs{3}/model".format(self.role,self.world_type,self.N_uav,self.N_obs,self.home_path))
+            print(hparam_str) 
+            writer = tf.summary.FileWriter(self.session_path + "/log/")
+            save_path = saver.save(session,self.session_path + "/model")
             print("Model saved in path: %s" % save_path)
 
             for step in range(num_steps):
@@ -289,7 +291,7 @@ class GraphMakerTrainer(object):
         return "lr_{0}_fchn_{1}_fvi_{2}".format(learning_rate, fchn, fvi)
 
     def LoadDatasetFromCSV(self):
-        with open(self.gml_folder_path + "/preprocessed.pickle", 'rb') as f:
+        with open(self.session_path + "/preprocessed.pickle", 'rb') as f:
             save = pickle.load(f)
             decimals = 6
             self.train_dataset = np.around(save['train_dataset'],decimals=decimals)
@@ -305,29 +307,21 @@ class GraphMakerTrainer(object):
             print('FC Validation set', self.valid_dataset.shape, self.valid_labels.shape)
             print('FC Test set', self.test_dataset.shape, self.test_labels.shape)
 
-    def GettingWorldDefinition(self, role = "gauss",world_type = 1,N_uav = 1,N_obs = 1,from_ROS = False):
+    def GettingWorldDefinition(self,learning_dataset_def,from_ROS = False):
         if from_ROS == True:
             self.world_definition = rospy.get_param('world_definition')
-            self.role = self.world_definition['role']
+            self.mission = self.world_definition['mission']
             self.world_type = self.world_definition['type']
-            self.N_uav = self.world_definition['N_uav']
+            self.N_agents = self.world_definition['N_agents']
             self.N_obs = self.world_definition['N_obs']
             self.obs_tube = self.world_definition['obs_tube']
-            self.uav_models = self.world_definition['uav_models']
+            self.agent_models = self.world_definition['agent_models']
             self.n_dataset = self.world_definition['n_dataset']
             self.solver_algorithm = self.world_definition['solver_algorithm']
             self.obs_pose_list = self.world_definition['obs_pose_list']
             self.home_path = self.world_definition['home_path']
-            self.depth_camera_use = self.world_definition['depth_camera_use']
+            self.image_depth_use = self.world_definition['image_depth_use']
 
         if from_ROS == False:
-            self.role = role
-            self.world_type = world_type
-            self.N_uav = N_uav
-            self.N_obs = N_obs
-            self.obs_tube = []
-            self.uav_models = ["typhoon_h480","typhoon_h480","typhoon_h480"]
-            self.n_dataset = 1
-            self.solver_algorithm = 'orca3'
-            self.home_path = 'joseandresmr'
-            self.depth_camera_use = False
+            self.learning_dataset_def = learning_dataset_def
+

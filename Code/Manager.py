@@ -1,3 +1,5 @@
+import rospkg
+
 from Pickler import *
 from PreProcesser import *
 from GraphMaker import *
@@ -9,21 +11,25 @@ class Manager(object):
 
         ### Hyperparameters selection
 
-        n_dataset = 1                           # Where to retrieve supervised dataset
+        learning_dataset_def = {}
 
-        mission = "pruebas"   
-        # mission = "queue_of_followers_ad"
-        # mission = "queue_of_followers_ap"     # What mission of the dataset choose for supervised dataset
-        
-        world_type = 1
-        N_uav = 2
-        N_obs = 2                            # Type of missions for supervised dataset        
-        
-        role = "path"
-        # role = "uav_ad"
-        # role = "uav_ap"
-        # role = "path_depth"                     # What roles of the mission choose for supervised dataset
-  
+        learning_dataset_folders = {}
+        learning_dataset_folders["world"] = "Delivery"
+        learning_dataset_folders["subworld"] = "Delivery"
+        learning_dataset_folders["mission"] = "Delivery"
+        learning_dataset_folders["submission"] = "2UAVs_follow_ap_safe"
+        learning_dataset_folders["n_dataset"] = 1
+        learning_dataset_def["folders"] = learning_dataset_folders
+
+        learning_dataset_def["N_neighbors_aware"] = 2
+        learning_dataset_def["teacher_role"] = "path"
+        learning_dataset_def["teacher_algorithm"] = "simple"
+
+        steps_to_perform = {}
+        steps_to_perform["Pickle"] = True
+        steps_to_perform["Preprocess"] = True
+        steps_to_perform["Train"] = True
+
         from_ROS = False                        # Retrieve simulation hyperparameters from ROS params
         future_vel_inst_list = [0]              # Instants in advace to feed the neural network
 
@@ -47,19 +53,23 @@ class Manager(object):
         for fvi in future_vel_inst_list:
 
             # A pickling and a preprocessment are assessed for the whole data providing required parameters
-            pickler = Pickler(mission,role,n_dataset,world_type,N_uav,N_obs,from_ROS,fvi)
-            preprocesser = PreProcesser(role,world_type,N_uav,N_obs)
+            if steps_to_perform["Pickle"]:
+                pickler = Pickler(learning_dataset_def,from_ROS,fvi)
+
+            if steps_to_perform["Preprocess"]:
+                preprocesser = PreProcesser(learning_dataset_def)
 
             # Creating the object for training
-            graphmakertrainer = GraphMakerTrainer(role,world_type,N_uav,N_obs)
+            if steps_to_perform["Train"]:
+                graphmakertrainer = GraphMakerTrainer(learning_dataset_def)
 
-            # Iteration between the different parameters that definde the different trainings
-            for learning_rate in learning_rates_list:
-                for fc_hidden_layers in fc_hidden_layers_list:
-                    for conv_hidden_layers in conv_hidden_layers_list:
+                # Iteration between the different parameters that definde the different trainings
+                for learning_rate in learning_rates_list:
+                    for fc_hidden_layers in fc_hidden_layers_list:
+                        for conv_hidden_layers in conv_hidden_layers_list:
 
-                        # Making a training defined with the actual chosen params
-                        graph = graphmakertrainer.TrainNewOne(batch_size,num_steps,fc_hidden_layers,
-                                                                conv_hidden_layers,learning_rate,fvi)
+                            # Making a training defined with the actual chosen params
+                            graph = graphmakertrainer.TrainNewOne(batch_size,num_steps,fc_hidden_layers,
+                                                                    conv_hidden_layers,learning_rate,fvi)
 
 manager = Manager()
