@@ -97,13 +97,13 @@ class Pickler(object):
             return single_pickle
 
         if role == "path":
-            input_dicc = ['own_vel','goal_pose_rel','neighbors_pos_rel','neighbors_vel','obs_pos_rel']
+            input_dicc = ['own_vel','goal_pose_rel','neighbors_pos_rel','neighbors_vel']
             output_dicc = ["sel_vel"]
         elif role == "agent_ad":
-            input_dicc = ['own_vel','goal_pose_rel','goal_vel','distance','neighbors_pos_rel','neighbors_vel','obs_pos_rel']
+            input_dicc = ['own_vel','goal_pose_rel','goal_vel','distance','neighbors_pos_rel','neighbors_vel']
             output_dicc = ["sel_vel"]
         elif role == "agent_ap":
-            input_dicc = ['own_vel','goal_pose_rel','goal_vel','neighbors_pos_rel','neighbors_vel','obs_pos_rel']
+            input_dicc = ['own_vel','goal_pose_rel','goal_vel','neighbors_pos_rel','neighbors_vel']
             output_dicc = ["sel_vel"]
 
         elif role == "path_depth":
@@ -127,7 +127,7 @@ class Pickler(object):
             elif n_input == "goal_pose_rel":
                 # print("goal",goal_pos[0].size)
                 # print("pickle",single_pickle)
-                single_pickle = np.concatenate((single_pickle,goal_pos),axis=1)
+                single_pickle = np.concatenate((single_pickle,goal_pos - own_pos),axis=1)
             elif n_input == "goal_vel":
                 single_pickle = np.concatenate((single_pickle,goal_vel),axis=1)
 
@@ -141,13 +141,12 @@ class Pickler(object):
             elif n_input == "neighbors_pos_rel":
                 for n_agent in range(self.learning_dataset_def["N_neighbors_aware"]):
                     neighbor_pos_rel = np.asarray([literal_eval(df["neigh"][i])[n_agent]["Pose"][0] for i in range(instants)])
-                    single_pickle = np.concatenate((single_pickle,neighbor_pos_rel),axis=1)
+                    single_pickle = np.concatenate((single_pickle,neighbor_pos_rel - own_pos),axis=1)
                 
             elif n_input == "neighbors_vel":
                 for n_agent in range(self.learning_dataset_def["N_neighbors_aware"]):
                     neighbor_vel = np.asarray([literal_eval(df["neigh"][i])[n_agent]["Twist"][0] for i in range(instants)])
-                    single_pickle = np.concatenate((single_pickle,neighbor_vel),axis=1)
-                
+                    single_pickle = np.concatenate((single_pickle,neighbor_vel),axis=1)                
 
         for n_output in output_dicc:
             if n_output == "sel_vel":

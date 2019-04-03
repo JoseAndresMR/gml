@@ -14,16 +14,16 @@ class Manager(object):
         learning_dataset_def = {}
 
         learning_dataset_folders = {}
-        learning_dataset_folders["world"] = "Delivery"
-        learning_dataset_folders["subworld"] = "Delivery"
-        learning_dataset_folders["mission"] = "Delivery"
-        learning_dataset_folders["submission"] = "2UAVs_follow_ap_safe"
+        learning_dataset_folders["world"] = "Gym"
+        learning_dataset_folders["subworld"] = "Empty_4_Cylinders"
+        learning_dataset_folders["mission"] = "Gym"
+        learning_dataset_folders["submission"] = "2UAVs_2paths"
         learning_dataset_folders["n_dataset"] = 1
         learning_dataset_def["folders"] = learning_dataset_folders
 
-        learning_dataset_def["N_neighbors_aware"] = 2
+        learning_dataset_def["N_neighbors_aware"] = 1
         learning_dataset_def["teacher_role"] = "path"
-        learning_dataset_def["teacher_algorithm"] = "simple"
+        learning_dataset_def["teacher_algorithm"] = "orca3"
 
         steps_to_perform = {}
         steps_to_perform["Pickle"] = True
@@ -33,9 +33,9 @@ class Manager(object):
         from_ROS = False                        # Retrieve simulation hyperparameters from ROS params
         future_vel_inst_list = [0]              # Instants in advace to feed the neural network
 
-        batch_size = 5                          # Number of instants from wich to learn every time
+        batch_size = 500                          # Number of instants from wich to learn every time
         learning_rates_list = [0.001]           # Gradient influence on weights tunning
-        num_steps = 1                           # Number of baches used while training
+        num_steps = 50000                           # Number of baches used while training
 
         # Fully Connected parameters
         fc_hidden_layers_list = [[20,20,20]]

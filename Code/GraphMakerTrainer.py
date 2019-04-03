@@ -71,9 +71,9 @@ class GraphMakerTrainer(object):
                     
                     fc_layer_outputs = []
                     fc_extended_num_inputs = int(data.shape[1])
-                    print(type(fc_extended_num_inputs))
+
                     nodes = [fc_extended_num_inputs]
-                    print(nodes)
+
                     for i in range(len(self.fc_hidden_layers)):
                         nodes.append(self.fc_hidden_layers[i])
                     nodes.append(fc_num_outputs)
@@ -247,7 +247,7 @@ class GraphMakerTrainer(object):
             merged_summary = tf.summary.merge_all()
             hparam_str = self.make_hparam_string(self.learning_rate,self.fc_hidden_layers,self.fvi)
             print(hparam_str) 
-            writer = tf.summary.FileWriter(self.session_path + "/log/")
+            writer = tf.summary.FileWriter(self.session_path + "/log/",graph)
             save_path = saver.save(session,self.session_path + "/model")
             print("Model saved in path: %s" % save_path)
 
@@ -293,7 +293,7 @@ class GraphMakerTrainer(object):
     def LoadDatasetFromCSV(self):
         with open(self.session_path + "/preprocessed.pickle", 'rb') as f:
             save = pickle.load(f)
-            decimals = 6
+            decimals = 2
             self.train_dataset = np.around(save['train_dataset'],decimals=decimals)
             self.train_labels = np.around(save['train_labels'],decimals=decimals)
             self.valid_dataset = np.around(save['valid_dataset'],decimals=decimals)
